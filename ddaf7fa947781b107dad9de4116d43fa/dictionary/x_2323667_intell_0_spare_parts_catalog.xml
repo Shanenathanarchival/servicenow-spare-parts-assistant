@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?><database>
+    <element attributes="enforce_dot_walk_cross_scope_access=true" db_object_id="4d95847547b81b107dad9de4116d436c" label="Spare Parts Catalog" max_length="40" name="x_2323667_intell_0_spare_parts_catalog" type="collection">
+        <element display="true" label="Part Name" max_length="120" name="part_name" type="string"/>
+        <element label="Reorder Threshold" max_length="40" name="reorder_threshold" type="integer"/>
+        <element label="Unit Cost" max_length="40" name="unit_cost" type="float"/>
+        <element label="Description &amp; Aliases" max_length="500" name="description_aliases" type="string"/>
+        <element attributes="edge_encryption_enabled=true" default="javascript:global.getNextObjNumberPadded();" label="Number" max_length="40" name="number" type="string"/>
+        <element label="Stock Quantity" max_length="40" name="stock_quantity" type="integer"/>
+        <element label="Category" max_length="40" name="category" type="string"/>
+    </element>
+</database>

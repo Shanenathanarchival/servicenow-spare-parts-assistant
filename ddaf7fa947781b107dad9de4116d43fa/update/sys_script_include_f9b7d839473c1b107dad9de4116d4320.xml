@@ -1,0 +1,162 @@
+<?xml version="1.0" encoding="UTF-8"?><record_update table="sys_script_include">
+    <sys_script_include action="INSERT_OR_UPDATE">
+        <access>package_private</access>
+        <active>true</active>
+        <api_name>x_2323667_intell_0.SparePartMatcher</api_name>
+        <caller_access/>
+        <client_callable>false</client_callable>
+        <description/>
+        <mobile_callable>false</mobile_callable>
+        <name>SparePartMatcher</name>
+        <sandbox_callable>false</sandbox_callable>
+        <script><![CDATA[var SparePartMatcher = Class.create();
+SparePartMatcher.prototype = {
+    initialize: function() {
+        this.restMessageName = 'x_2323667_intell_0.Gemini Spare Parts Matcher';
+        this.methodName = 'matchPart';
+        this.apiKeyProp = 'x_2323667_intell_0.gemini_api_key';
+        this.catalogTable = 'x_2323667_intell_0_spare_parts_catalog';
+        this.confidenceThreshold = 80;
+    },
+
+    matchRequest: function(technicianDescription) {
+        var result = {
+            matched_part_sys_id: '',
+            matched_part_name: '',
+            confidence_score: 0,
+            ambiguity_flag: false,
+            candidate_options: '',
+            reasoning: '',
+            error: ''
+        };
+
+        if (!technicianDescription || gs.nil(technicianDescription)) {
+            result.error = 'No technician description provided.';
+            return result;
+        }
+
+        var apiKey = gs.getProperty(this.apiKeyProp, '');
+        if (!apiKey) {
+            result.error = 'Missing API key property: ' + this.apiKeyProp;
+            return result;
+        }
+
+        var catalog = this._getCatalogItems();
+        if (catalog.length === 0) {
+            result.error = 'No catalog items found in ' + this.catalogTable;
+            return result;
+        }
+
+        var promptText = this._buildPrompt(technicianDescription, catalog);
+        var payload = {
+            contents: [
+                {
+                    parts: [
+                        { text: promptText }
+                    ]
+                }
+            ],
+            generationConfig: {
+                temperature: 0.1,
+                responseMimeType: 'application/json'
+            }
+        };
+
+        try {
+            var rm = new sn_ws.RESTMessageV2(this.restMessageName, this.methodName);
+            rm.setStringParameterNoEscape('api_key', apiKey);
+            rm.setStringParameterNoEscape('request_body', JSON.stringify(payload));
+
+            var response = rm.execute();
+            var httpStatus = response.getStatusCode();
+            var responseBody = response.getBody();
+
+            if (httpStatus < 200 || httpStatus >= 300) {
+                result.error = 'Gemini HTTP ' + httpStatus + ': ' + responseBody;
+                gs.error('[SparePartMatcher] ' + result.error);
+                return result;
+            }
+
+            var parsedOuter = JSON.parse(responseBody);
+            var rawText = parsedOuter.candidates[0].content.parts[0].text;
+            var aiResult = JSON.parse(rawText);
+
+            var score = parseInt(aiResult.confidence_score, 10) || 0;
+            var isAmbiguous = Boolean(aiResult.ambiguity_flag) || (score < this.confidenceThreshold);
+
+            result.matched_part_sys_id = aiResult.matched_part_sys_id || '';
+            result.matched_part_name = aiResult.matched_part_name || '';
+            result.confidence_score = score;
+            result.ambiguity_flag = isAmbiguous;
+            result.candidate_options = Array.isArray(aiResult.candidate_options)
+                ? aiResult.candidate_options.join(' | ')
+                : (aiResult.candidate_options || '');
+            result.reasoning = aiResult.reasoning || '';
+
+            return result;
+        } catch (ex) {
+            result.error = 'Exception during Gemini call: ' + ex.message;
+            gs.error('[SparePartMatcher] ' + result.error);
+            return result;
+        }
+    },
+
+    _getCatalogItems: function() {
+        var items = [];
+        var gr = new GlideRecord(this.catalogTable);
+        gr.query();
+        while (gr.next()) {
+            items.push({
+                sys_id: gr.getUniqueValue(),
+                part_name: gr.getDisplayValue('part_name') || gr.getValue('part_name') || '',
+                category: gr.getDisplayValue('category') || gr.getValue('category') || '',
+                stock_quantity: gr.getValue('stock_quantity') || '0',
+                unit_cost: gr.getValue('unit_cost') || '0',
+                description_aliases: gr.getValue('description_aliases') || ''
+            });
+        }
+        return items;
+    },
+
+    _buildPrompt: function(description, catalog) {
+        return [
+            'You are an industrial maintenance spare parts matching assistant.',
+            'Match the technician request description against the provided catalog items.',
+            'Pay close attention to specs, dimensions, voltage, thread/port type, and near-duplicate parts.',
+            'Set ambiguity_flag to true if two or more catalog items are plausible or if confidence_score is below 80.',
+            'Only return a matched_part_sys_id from the catalog list below (or empty string if none fit).',
+            '',
+            'Return strictly valid JSON matching this schema:',
+            '{',
+            '  "matched_part_sys_id": "string",',
+            '  "matched_part_name": "string",',
+            '  "confidence_score": 0,',
+            '  "ambiguity_flag": false,',
+            '  "candidate_options": ["string"],',
+            '  "reasoning": "string"',
+            '}',
+            '',
+            'Technician Request Description:',
+            description,
+            '',
+            'Catalog Items:',
+            JSON.stringify(catalog, null, 2)
+        ].join('\n');
+    },
+
+    type: 'SparePartMatcher'
+};]]></script>
+        <sys_class_name>sys_script_include</sys_class_name>
+        <sys_created_by>admin</sys_created_by>
+        <sys_created_on>2026-11-27 04:25:44</sys_created_on>
+        <sys_id>f9b7d839473c1b107dad9de4116d4320</sys_id>
+        <sys_mod_count>0</sys_mod_count>
+        <sys_name>SparePartMatcher</sys_name>
+        <sys_package display_value="Intelligent Spare Parts Request Assistant" source="x_2323667_intell_0">ddaf7fa947781b107dad9de4116d43fa</sys_package>
+        <sys_policy>read</sys_policy>
+        <sys_scope display_value="Intelligent Spare Parts Request Assistant">ddaf7fa947781b107dad9de4116d43fa</sys_scope>
+        <sys_update_name>sys_script_include_f9b7d839473c1b107dad9de4116d4320</sys_update_name>
+        <sys_updated_by>admin</sys_updated_by>
+        <sys_updated_on>2026-11-27 04:25:44</sys_updated_on>
+    </sys_script_include>
+</record_update>
