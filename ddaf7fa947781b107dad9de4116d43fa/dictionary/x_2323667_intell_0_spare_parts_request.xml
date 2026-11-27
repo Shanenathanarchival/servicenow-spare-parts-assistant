@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?><database>
+    <element attributes="enforce_dot_walk_cross_scope_access=true" db_object_id="184b043147f81b107dad9de4116d434c" extends="task" label="Spare Parts Request" max_length="40" name="x_2323667_intell_0_spare_parts_request" type="collection">
+        <element label="Technician Description" max_length="500" name="technician_description" type="string"/>
+        <element label="Matched Part" max_length="32" name="matched_part" reference="x_2323667_intell_0_spare_parts_catalog" type="reference"/>
+        <element label="Technician Confirmed" max_length="40" name="technician_confirmed" type="boolean"/>
+        <element label="Candidate Options" max_length="1000" name="candidate_options" type="string"/>
+        <element label="Ambiguity Flag" max_length="40" name="ambiguity_flag" type="boolean"/>
+        <element label="AI Confidence Score" max_length="40" name="ai_confidence_score" type="integer"/>
+        <element label="Quantity Requested" max_length="40" name="quantity_requested" type="integer"/>
+    </element>
+</database>

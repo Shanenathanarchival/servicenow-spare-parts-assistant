@@ -1,0 +1,316 @@
+<?xml version="1.0" encoding="UTF-8"?><record_update table="sp_widget">
+    <sp_widget action="INSERT_OR_UPDATE">
+        <category>custom</category>
+        <client_script><![CDATA[api.controller = function() {
+  var c = this;
+  c.description = '';
+  c.quantity = 1;
+  c.statusMessage = '';
+
+  c.findMatches = function() {
+    c.statusMessage = '';
+    if (!c.description || !c.description.trim()) return;
+    c.server.get({
+      action: 'search',
+      query: c.description
+    }).then(function(res) {
+      c.data = res.data;
+    });
+  };
+
+  c.getSelectedPart = function() {
+    if (!c.data || !c.data.matches) return null;
+    return c.data.matches.find(function(m) {
+      return m.sys_id === c.data.selectedPartId;
+    }) || null;
+  };
+
+  c.getStockLabel = function() {
+    var part = c.getSelectedPart();
+    if (!part) return 'No Part Selected';
+    if (part.stock_quantity <= 0) return 'Out of Stock';
+    if (c.quantity > part.stock_quantity) return 'Exceeds Stock (' + part.stock_quantity + ' available)';
+    if (part.stock_quantity - c.quantity <= part.reorder_threshold) return 'Will Trigger Low Stock / Reorder';
+    return 'In Stock';
+  };
+
+  c.submitRequest = function() {
+    var selected = c.getSelectedPart();
+    if (!selected) return;
+
+    c.server.get({
+      action: 'submit_request',
+      rawDescription: c.description,
+      selectedPartId: selected.sys_id,
+      ambiguityFlag: c.data.ambiguityFlag,
+      confidenceScore: c.data.confidenceScore,
+      candidates: c.data.matches,
+      quantity: c.quantity
+    }).then(function(res) {
+      c.data = res.data;
+      c.description = '';
+      c.quantity = 1;
+      c.statusMessage = 'Submitted request: ' + (c.data.submittedNumber || 'Saved');
+    });
+  };
+};]]></client_script>
+        <controller_as>c</controller_as>
+        <css/>
+        <data_table>sp_instance</data_table>
+        <demo_data/>
+        <description/>
+        <docs/>
+        <field_list/>
+        <has_preview>false</has_preview>
+        <id>spare_parts_matcher</id>
+        <internal>false</internal>
+        <link><![CDATA[function link(scope, element, attrs, controller) {  }]]></link>
+        <name>Spare Parts Matcher</name>
+        <option_schema/>
+        <public>false</public>
+        <roles/>
+        <script><![CDATA[(function() {
+  var PART_TABLE = 'x_2323667_intell_0_spare_parts_catalog';
+  var REQ_TABLE  = 'x_2323667_intell_0_spare_parts_request';
+
+  if (!input) {
+    data.myRequests = getRecentRequests(REQ_TABLE);
+    return;
+  }
+
+  if (input.action === 'search') {
+    var query = (input.query || '').toLowerCase().trim();
+    var tokens = query.split(/[^a-z0-9]+/).filter(function(t) { return t.length > 1; });
+    var candidates = [];
+
+    var gr = new GlideRecord(PART_TABLE);
+    gr.query();
+    while (gr.next()) {
+      var partNumber = gr.getValue('number') || '';
+      var partName   = gr.getValue('part_name') || '';
+      var aliases    = gr.getValue('description_aliases') || '';
+      var category   = gr.getValue('category') || '';
+      var stock      = parseInt(gr.getValue('stock_quantity'), 10) || 0;
+      var reorder    = parseInt(gr.getValue('reorder_threshold'), 10) || 0;
+      var unitCost   = parseFloat(gr.getValue('unit_cost')) || 0;
+
+      var haystack = (partNumber + ' ' + partName + ' ' + aliases + ' ' + category).toLowerCase();
+      var score = 0;
+
+      if (query && haystack.indexOf(query) !== -1) {
+        score += 10;
+      }
+      tokens.forEach(function(tok) {
+        if (partNumber.toLowerCase().indexOf(tok) !== -1) score += 6;
+        if (partName.toLowerCase().indexOf(tok) !== -1) score += 4;
+        if (aliases.toLowerCase().indexOf(tok) !== -1) score += 3;
+        if (category.toLowerCase().indexOf(tok) !== -1) score += 2;
+      });
+
+      if (score > 0) {
+        candidates.push({
+          sys_id: gr.getUniqueValue(),
+          part_number: partNumber,
+          part_name: partName,
+          category: category,
+          stock_quantity: stock,
+          reorder_threshold: reorder,
+          unit_cost: unitCost,
+          score: score
+        });
+      }
+    }
+
+    candidates.sort(function(a, b) { return b.score - a.score; });
+    var top = candidates.slice(0, 5);
+
+    var isAmbiguous = false;
+    var confidence = 0;
+    var selectedId = '';
+
+    if (top.length === 1 && top[0].score >= 4) {
+      confidence = Math.min(99, top[0].score * 10);
+      selectedId = top[0].sys_id;
+    } else if (top.length > 1) {
+      var gap = top[0].score - top[1].score;
+      confidence = Math.min(95, Math.max(25, top[0].score * 8));
+      isAmbiguous = !(top[0].score >= 8 && gap >= 5);
+      selectedId = top[0].sys_id;
+    }
+
+    data.matches = top;
+    data.searched = true;
+    data.ambiguityFlag = isAmbiguous;
+    data.confidenceScore = confidence;
+    data.selectedPartId = selectedId;
+  }
+
+  if (input.action === 'submit_request') {
+    var candidateSummary = (input.candidates || []).map(function(c) {
+      return (c.part_number ? c.part_number + ': ' : '') + c.part_name + ' (Stock: ' + c.stock_quantity + ')';
+    }).join(' | ');
+
+    var reqGr = new GlideRecord(REQ_TABLE);
+    reqGr.initialize();
+    reqGr.setValue('technician_description', input.rawDescription || '');
+    reqGr.setValue('matched_part', input.selectedPartId || '');
+    reqGr.setValue('candidate_options', candidateSummary);
+    reqGr.setValue('ai_confidence_score', parseInt(input.confidenceScore, 10) || 0);
+    reqGr.setValue('ambiguity_flag', Boolean(input.ambiguityFlag));
+    reqGr.setValue('technician_confirmed', true);
+    reqGr.setValue('quantity_requested', parseInt(input.quantity, 10) || 1);
+
+    var createdId = reqGr.insert();
+
+    data.submittedNumber = createdId ? (reqGr.getDisplayValue('number') || reqGr.getUniqueValue().slice(0, 8)) : '';
+    data.matches = [];
+    data.searched = false;
+    data.myRequests = getRecentRequests(REQ_TABLE);
+  }
+
+  function getRecentRequests(tableName) {
+    var list = [];
+    var rGr = new GlideRecord(tableName);
+    rGr.orderByDesc('sys_created_on');
+    rGr.setLimit(10);
+    rGr.query();
+    while (rGr.next()) {
+      var ambVal = rGr.getValue('ambiguity_flag');
+      var confVal = rGr.getValue('technician_confirmed');
+      list.push({
+        number: rGr.getDisplayValue('number') || rGr.getUniqueValue().slice(0, 8),
+        description: rGr.getValue('technician_description') || '',
+        matched_part: rGr.getDisplayValue('matched_part') || 'Unmatched',
+        confidence: parseInt(rGr.getValue('ai_confidence_score'), 10) || 0,
+        ambiguous: ambVal === '1' || ambVal === 'true',
+        confirmed: confVal === '1' || confVal === 'true',
+        quantity: parseInt(rGr.getValue('quantity_requested'), 10) || 0
+      });
+    }
+    return list;
+  }
+})();]]></script>
+        <servicenow>false</servicenow>
+        <sys_class_name>sp_widget</sys_class_name>
+        <sys_created_by>admin</sys_created_by>
+        <sys_created_on>2026-11-27 04:51:54</sys_created_on>
+        <sys_id>f53ed075477c1b107dad9de4116d43e1</sys_id>
+        <sys_mod_count>1</sys_mod_count>
+        <sys_name>Spare Parts Matcher</sys_name>
+        <sys_package display_value="Intelligent Spare Parts Request Assistant" source="x_2323667_intell_0">ddaf7fa947781b107dad9de4116d43fa</sys_package>
+        <sys_policy/>
+        <sys_scope display_value="Intelligent Spare Parts Request Assistant">ddaf7fa947781b107dad9de4116d43fa</sys_scope>
+        <sys_update_name>sp_widget_f53ed075477c1b107dad9de4116d43e1</sys_update_name>
+        <sys_updated_by>admin</sys_updated_by>
+        <sys_updated_on>2026-11-27 04:52:28</sys_updated_on>
+        <template><![CDATA[<div class="panel panel-default">
+  <div class="panel-heading">
+    <h3 class="panel-title">Intelligent Spare Parts Request Assistant</h3>
+  </div>
+  <div class="panel-body">
+    <div class="alert alert-success" ng-if="c.statusMessage">
+      {{c.statusMessage}}
+    </div>
+
+    <div class="form-group">
+      <label for="partDesc">Technician Part Description</label>
+      <div class="input-group">
+        <input id="partDesc" type="text" class="form-control"
+               ng-model="c.description"
+               placeholder="e.g., 40mm bearing or packaging conveyor belt" />
+        <span class="input-group-btn">
+          <button class="btn btn-primary" type="button" ng-click="c.findMatches()">
+            Match Part
+          </button>
+        </span>
+      </div>
+    </div>
+
+    <div ng-if="c.data.searched">
+      <div class="alert alert-warning" ng-if="c.data.ambiguityFlag">
+        <strong>Ambiguous match flagged ({{c.data.confidenceScore}}% confidence):</strong>
+        Confirm the intended catalog part below.
+      </div>
+      <div class="alert alert-info" ng-if="!c.data.ambiguityFlag && c.data.matches.length > 0">
+        <strong>High-confidence match ({{c.data.confidenceScore}}%):</strong>
+        Verify the part and quantity before submitting.
+      </div>
+      <div class="alert alert-danger" ng-if="c.data.matches.length === 0">
+        No catalog matches found. Try refining the description or aliases.
+      </div>
+
+      <div ng-if="c.data.matches.length > 0">
+        <div class="radio" ng-repeat="m in c.data.matches">
+          <label>
+            <input type="radio" name="partChoice"
+                   ng-model="c.data.selectedPartId"
+                   ng-value="m.sys_id" />
+            <strong>{{m.part_number}}</strong> — {{m.part_name}}
+            <span class="text-muted" ng-if="m.category">({{m.category}})</span>
+            <span class="label label-default">Stock: {{m.stock_quantity}}</span>
+            <span class="text-muted" ng-if="m.unit_cost">${{m.unit_cost}}</span>
+          </label>
+        </div>
+
+        <div class="row" style="margin-top: 15px;">
+          <div class="col-sm-4">
+            <label for="qtyInput">Quantity Requested</label>
+            <input id="qtyInput" type="number" min="1" class="form-control"
+                   ng-model="c.quantity" />
+          </div>
+          <div class="col-sm-8" style="padding-top: 25px;">
+            <span class="label label-info">{{c.getStockLabel()}}</span>
+          </div>
+        </div>
+
+        <button class="btn btn-success" style="margin-top: 15px;"
+                type="button" ng-click="c.submitRequest()">
+          Confirm &amp; Submit Request
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="panel panel-default" style="margin-top: 20px;">
+  <div class="panel-heading">
+    <h4 class="panel-title">Recent Spare Part Requests</h4>
+  </div>
+  <table class="table table-striped">
+    <thead>
+      <tr>
+        <th>Number</th>
+        <th>Description</th>
+        <th>Matched Part</th>
+        <th>Confidence</th>
+        <th>Ambiguous</th>
+        <th>Confirmed</th>
+        <th>Qty</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr ng-repeat="r in c.data.myRequests">
+        <td>{{r.number}}</td>
+        <td>{{r.description}}</td>
+        <td>{{r.matched_part}}</td>
+        <td>{{r.confidence}}%</td>
+        <td>{{r.ambiguous ? 'Yes' : 'No'}}</td>
+        <td>{{r.confirmed ? 'Yes' : 'No'}}</td>
+        <td>{{r.quantity}}</td>
+      </tr>
+    </tbody>
+  </table>
+</div>]]></template>
+    </sp_widget>
+    <sys_es_latest_script action="INSERT_OR_UPDATE">
+        <id>f53ed075477c1b107dad9de4116d43e1</id>
+        <sys_created_by>admin</sys_created_by>
+        <sys_created_on>2026-11-27 04:51:55</sys_created_on>
+        <sys_id>f53ed075477c1b107dad9de4116d43e6</sys_id>
+        <sys_mod_count>0</sys_mod_count>
+        <sys_updated_by>admin</sys_updated_by>
+        <sys_updated_on>2026-11-27 04:51:55</sys_updated_on>
+        <table>sp_widget</table>
+        <use_es_latest>true</use_es_latest>
+    </sys_es_latest_script>
+</record_update>

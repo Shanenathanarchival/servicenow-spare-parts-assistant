@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?><record_update table="sys_rest_message_fn_headers">
+    <sys_rest_message_fn_headers action="INSERT_OR_UPDATE">
+        <name>x-goog-api-key</name>
+        <rest_message_function display_value="matchPart">b3161475473c1b107dad9de4116d4350</rest_message_function>
+        <sys_class_name>sys_rest_message_fn_headers</sys_class_name>
+        <sys_created_by>admin</sys_created_by>
+        <sys_created_on>2026-11-27 04:22:31</sys_created_on>
+        <sys_id>a4f6587547f81b107dad9de4116d4339</sys_id>
+        <sys_mod_count>0</sys_mod_count>
+        <sys_name>x-goog-api-key</sys_name>
+        <sys_package display_value="Intelligent Spare Parts Request Assistant" source="x_2323667_intell_0">ddaf7fa947781b107dad9de4116d43fa</sys_package>
+        <sys_policy/>
+        <sys_scope display_value="Intelligent Spare Parts Request Assistant">ddaf7fa947781b107dad9de4116d43fa</sys_scope>
+        <sys_update_name>sys_rest_message_fn_headers_a4f6587547f81b107dad9de4116d4339</sys_update_name>
+        <sys_updated_by>admin</sys_updated_by>
+        <sys_updated_on>2026-11-27 04:22:31</sys_updated_on>
+        <value>${api_key}</value>
+    </sys_rest_message_fn_headers>
+</record_update>

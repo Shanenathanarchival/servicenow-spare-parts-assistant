@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?><record_update table="sys_rest_message_fn">
+    <sys_rest_message_fn action="INSERT_OR_UPDATE">
+        <authentication_type>inherit_from_parent</authentication_type>
+        <basic_auth_password/>
+        <basic_auth_profile/>
+        <basic_auth_user/>
+        <content>${request_body}</content>
+        <function_name>matchPart</function_name>
+        <http_method>post</http_method>
+        <lock>false</lock>
+        <oauth2_profile/>
+        <protocol_name/>
+        <qualified_name>Gemini Spare Parts Matcher [ matchPart ]</qualified_name>
+        <rest_endpoint>https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent</rest_endpoint>
+        <rest_message display_value="Gemini Spare Parts Matcher">f23518f1473c1b107dad9de4116d4326</rest_message>
+        <sys_class_name>sys_rest_message_fn</sys_class_name>
+        <sys_created_by>admin</sys_created_by>
+        <sys_created_on>2026-11-27 04:22:31</sys_created_on>
+        <sys_id>b3161475473c1b107dad9de4116d4350</sys_id>
+        <sys_mod_count>0</sys_mod_count>
+        <sys_name>matchPart</sys_name>
+        <sys_package display_value="Intelligent Spare Parts Request Assistant" source="x_2323667_intell_0">ddaf7fa947781b107dad9de4116d43fa</sys_package>
+        <sys_policy/>
+        <sys_scope display_value="Intelligent Spare Parts Request Assistant">ddaf7fa947781b107dad9de4116d43fa</sys_scope>
+        <sys_update_name>sys_rest_message_fn_b3161475473c1b107dad9de4116d4350</sys_update_name>
+        <sys_updated_by>admin</sys_updated_by>
+        <sys_updated_on>2026-11-27 04:22:31</sys_updated_on>
+        <use_auth_mid_server/>
+        <use_basic_auth>false</use_basic_auth>
+        <use_mid_server/>
+        <use_mutual_auth>false</use_mutual_auth>
+    </sys_rest_message_fn>
+</record_update>
